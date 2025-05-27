@@ -1,0 +1,18 @@
+# Node modules
+node_modules/
+
+# Temporary media files
+tmp/
+
+# Session files
+session.json
+
+# Logs
+*.log
+
+# Environment variables file (if used)
+.env
+
+# OS system files
+.DS_Store
+Thumbs.db
