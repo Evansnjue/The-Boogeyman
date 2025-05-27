@@ -1,0 +1,33 @@
+{
+  "name": "the-boogie-man",
+  "version": "1.0.0",
+  "description": "A powerful WhatsApp bot using Baileys with media tools, fun commands, and anti-ban features.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.1",
+    "@hapi/boom": "^10.0.1",
+    "fluent-ffmpeg": "^2.1.2",
+    "pino": "^8.17.0",
+    "yt-dlp-exec": "^1.1.5",
+    "axios": "^1.6.8",
+    "form-data": "^4.0.0",
+    "node-fetch": "^3.3.2",
+    "chalk": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "whatsapp",
+    "baileys",
+    "bot",
+    "media",
+    "nodejs"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
