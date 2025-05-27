@@ -2,32 +2,37 @@ import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion, useSingleFil
 import { Boom } from '@hapi/boom';
 import fs from 'fs';
 import path from 'path';
+import http from 'http';
 
-// Load session from file or create new
-const { state, saveState } = useSingleFileAuthState('./session.json');
+const SESSION_FILE = process.env.SESSION_FILE || './session.json';
+const { state, saveState } = useSingleFileAuthState(SESSION_FILE);
 
-// Load commands from /commands folder
 const commands = new Map();
 const commandsPath = path.join('./commands');
-for (const file of fs.readdirSync(commandsPath)) {
-  if (file.endsWith('.js')) {
-    const command = (await import(path.join(commandsPath, file))).default;
-    commands.set(command.name, command);
+
+// Load commands dynamically in an async function
+async function loadCommands() {
+  for (const file of fs.readdirSync(commandsPath)) {
+    if (file.endsWith('.js')) {
+      // Use dynamic import for ESM (your package.json should have "type": "module")
+      const filePath = path.resolve(commandsPath, file);
+      const command = (await import(`file://${filePath}`)).default;
+      commands.set(command.name, command);
+    }
   }
 }
 
 async function startBot() {
   try {
+    await loadCommands();
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
       version,
       auth: state,
       printQRInTerminal: true,
-      // logger: P({ level: 'info' }), // Uncomment for debug logs
     });
 
-    // Save auth state on credentials update
     sock.ev.on('creds.update', saveState);
 
     sock.ev.on('connection.update', (update) => {
@@ -47,7 +52,6 @@ async function startBot() {
       }
     });
 
-    // Anti delete: detect deleted messages and notify
     sock.ev.on('message.delete', async (msg) => {
       try {
         if (!msg.key.fromMe && msg.message) {
@@ -60,17 +64,13 @@ async function startBot() {
       }
     });
 
-    // Anti view once (can be handled by intercepting message type 'viewOnceMessage')
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type !== 'notify') return;
-
       const msg = messages[0];
       if (!msg.message) return;
 
-      // Check if message is view once
       if (msg.message.viewOnceMessage) {
         try {
-          // Extract the actual message inside viewOnceMessage and resend it
           const innerMsg = msg.message.viewOnceMessage.message;
           await sock.sendMessage(msg.key.remoteJid, {
             text: `⚠️ Someone sent a view-once message, here is the content:`,
@@ -82,16 +82,13 @@ async function startBot() {
       }
     });
 
-    // Message handler for commands
+    // Command handler
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type !== 'notify') return;
-
       const msg = messages[0];
       if (!msg.message || msg.key.fromMe) return;
 
       let text = '';
-
-      // Support for different message types
       if (msg.message.conversation) text = msg.message.conversation;
       else if (msg.message.extendedTextMessage?.text) text = msg.message.extendedTextMessage.text;
       else return;
@@ -116,8 +113,17 @@ async function startBot() {
 
   } catch (error) {
     console.error('Bot crashed:', error);
-    setTimeout(startBot, 5000); // retry after 5 seconds
+    setTimeout(startBot, 5000);
   }
 }
 
 startBot();
+
+// --- HEALTHCHECK FOR RAILWAY ---
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('Bot is running!\n');
+}).listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+});
